@@ -235,6 +235,8 @@ def edit():
     kind, name = entry
     preset = next(p for p in state[kind] if p['name'] == name)
     _open(preset['_file'])
+    vim.command('normal! gg')
+    vim.Function('search')(r'"%sPresets"' % kind)
     vim.Function('search')(r'"name"\s*:\s*"%s"' % name)
 
 

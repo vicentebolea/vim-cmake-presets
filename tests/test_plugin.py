@@ -112,6 +112,14 @@ class EditTest(unittest.TestCase):
         self.assertEqual(out[0], 'CMakePresets.json')
         self.assertIn('"release"', out[1])
 
+    def test_o_on_build_preset_jumps_to_build_section(self):
+        # "default" is both a configure and a build preset.
+        out = vim_eval(['call search("^+ default")', 'call search("^+ default", "W")',
+                        'normal o'],
+                       '[getline("."), search(\'"buildPresets"\', "nbW")]')
+        self.assertIn('configurePreset', out[0])
+        self.assertGreater(out[1], 0)
+
 
     def test_enter_expands_and_collapses(self):
         enter = 'execute "normal \\<CR>"'
