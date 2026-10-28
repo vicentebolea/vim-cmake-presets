@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 
 import vim
 
@@ -9,6 +10,8 @@ HELP = [
     'o     open preset in file',
     'B     build',
     'C     configure',
+    'v     open CMakeCache.txt',
+    'X     clean (delete) build dir',
     'R     refresh',
     'q     close',
 ]
@@ -114,8 +117,10 @@ def refresh():
                 opened = key in state['expanded']
                 default = ' (default)' if p['name'] == 'default' else ''
                 state['lines'][len(lines) + 1] = key
-                lines.append('%s %s%s' % ('-' if opened else '+',
-                                          p.get('displayName', p['name']), default))
+                source = os.path.splitext(os.path.basename(p['_file']))[0]
+                lines.append('%s %s%s [%s]' % ('-' if opened else '+',
+                                               p.get('displayName', p['name']),
+                                               default, source))
                 if opened:
                     for d in _details(p):
                         state['lines'][len(lines) + 1] = key
@@ -145,10 +150,14 @@ def toggle():
     vim.command('nnoremap <buffer> <silent> <LeftMouse> '
                 '<LeftMouse>:py3 cmake_presets.expand()<CR>')
     vim.command('nnoremap <buffer> <silent> o :py3 cmake_presets.edit()<CR>')
+    vim.command('nnoremap <buffer> <silent> v :py3 cmake_presets.open_cache()<CR>')
+    vim.command('nnoremap <buffer> <silent> X :py3 cmake_presets.clean()<CR>')
     vim.command('nnoremap <buffer> <silent> R :py3 cmake_presets.refresh()<CR>')
     vim.command('nnoremap <buffer> <silent> q :close<CR>')
     vim.command('syntax match CMakePresetsHeader /^\\(Configure\\|Build\\)$/')
-    vim.command('syntax match CMakePresetsDefault /^[+-] .*(default)$/')
+    vim.command(r'syntax match CMakePresetsDefault /^[+-] .*(default) \[[^]]*\]$/')
+    vim.command(r'syntax match CMakePresetsSource / \[[^]]*\]$/')
+    vim.command('highlight default link CMakePresetsSource Comment')
     vim.command(r'syntax match CMakePresetsFlag /^    \zs\w\+\ze:/')
     vim.command(r'syntax match CMakePresetsVar /^      \zs[^=]\+\ze=/')
     vim.command('highlight default CMakePresetsFlag ctermfg=cyan guifg=cyan')
@@ -196,14 +205,59 @@ def expand():
     vim.current.window.cursor = (row, 0)
 
 
+def _open(path):
+    vim.command('wincmd h')
+    if vim.current.buffer.number == state['buf']:
+        vim.command('leftabove vsplit')
+    vim.command('edit ' + vim.eval('fnameescape(%r)' % path))
+
+
+def open_cache():
+    entry = state['lines'].get(int(vim.eval('line(".")')))
+    if not entry:
+        return
+    kind, name = entry
+    if kind == 'build':
+        name = next(b for b in state['build']
+                    if b['name'] == name).get('configurePreset', name)
+    bdir = _binary_dir(name)
+    path = bdir and os.path.join(bdir, 'CMakeCache.txt')
+    if path and os.path.isfile(path):
+        _open(path)
+    else:
+        vim.command('echo "No CMakeCache.txt for preset %s (configure it first)"' % name)
+
+
 def edit():
     entry = state['lines'].get(int(vim.eval('line(".")')))
     if not entry:
         return
     kind, name = entry
     preset = next(p for p in state[kind] if p['name'] == name)
-    vim.command('wincmd h')
-    if vim.current.buffer.number == state['buf']:
-        vim.command('leftabove vsplit')
-    vim.command('edit ' + vim.eval('fnameescape(%r)' % preset['_file']))
+    _open(preset['_file'])
     vim.Function('search')(r'"name"\s*:\s*"%s"' % name)
+
+
+def ask(prompt):
+    vim.vars['cmake_presets_prompt'] = prompt + ' (y/N) '
+    return vim.eval('input(g:cmake_presets_prompt)').lower() == 'y'
+
+
+def clean():
+    entry = state['lines'].get(int(vim.eval('line(".")')))
+    if not entry:
+        return
+    kind, name = entry
+    if kind == 'build':
+        name = next(b for b in state['build']
+                    if b['name'] == name).get('configurePreset', name)
+    bdir = _binary_dir(name)
+    if not bdir or not os.path.isfile(os.path.join(bdir, 'CMakeCache.txt')):
+        vim.command('echo "Nothing to clean for preset %s"' % name)
+        return
+    if os.path.realpath(state['root']).startswith(os.path.realpath(bdir)):
+        vim.command('echoerr "Refusing to delete the source tree"')
+        return
+    if ask('Delete %s ?' % bdir):
+        shutil.rmtree(bdir)
+        vim.command('echo "Deleted %s"' % bdir.replace('"', ''))

@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -8,13 +9,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIXTURE = os.path.join(ROOT, 'tests', 'fixtures')
 
 
-def vim_eval(commands, expr, cwd=FIXTURE):
+def vim_eval(commands, expr, cwd=FIXTURE, pre=()):
     """Run commands in headless Vim after opening the sidebar; return expr."""
     os.makedirs(os.path.join(ROOT, 'tmp'), exist_ok=True)
     with tempfile.TemporaryDirectory(dir=os.path.join(ROOT, 'tmp')) as d:
         out = os.path.join(d, 'out')
-        args = ['vim', '-es', '-u', 'NONE', '-N', '--cmd', 'syntax on', '--cmd', 'set rtp+=' + ROOT,
-                '-c', 'runtime plugin/cmake_presets.vim', '-c', 'CMakePresets']
+        args = ['vim', '-es', '-u', 'NONE', '-N', '--cmd', 'syntax on']
+        for c in pre:
+            args += ['--cmd', c]
+        args += ['--cmd', 'set rtp+=' + ROOT,
+                 '-c', 'runtime plugin/cmake_presets.vim', '-c', 'CMakePresets']
         for c in commands:
             args += ['-c', c]
         args += ['-c', 'call writefile([json_encode(%s)], "%s")' % (expr, out),
@@ -34,8 +38,18 @@ class SidebarTest(unittest.TestCase):
         lines = vim_eval([], 'getline(1, "$")')
         self.assertIn('Configure', lines)
         self.assertIn('Build', lines)
-        self.assertEqual(lines.count('+ default (default)'), 2)
+        self.assertEqual(lines.count('+ default (default) [CMakePresets]'), 2)
         self.assertLess(lines.index('Configure'), lines.index('Build'))
+
+    def test_source_file_shown(self):
+        lines = vim_eval([], 'getline(1, "$")')
+        self.assertIn('+ mine [CMakeUserPresets]', lines)
+        self.assertIn('+ debug [CMakePresets]', lines)
+
+    def test_source_file_commented_color(self):
+        out = vim_eval(['call search("mine")'],
+                       'synIDattr(synID(line("."), col("$") - 2, 1), "name")')
+        self.assertEqual(out, 'CMakePresetsSource')
 
     def test_hidden_preset_omitted(self):
         self.assertNotIn('+ base', vim_eval([], 'getline(1, "$")'))
@@ -49,8 +63,8 @@ class SidebarTest(unittest.TestCase):
         lines = vim_eval(['normal G'], 'getline(1, "$")')
         self.assertEqual(lines[-1], 'q     close')
         self.assertIn('o     open preset in file', lines)
-        self.assertIn('B     build', lines[-4:])
-        self.assertIn('C     configure', lines[-4:])
+        self.assertIn('B     build', lines[-7:])
+        self.assertIn('C     configure', lines[-7:])
 
     def test_sidebar_on_right(self):
         name = vim_eval(['wincmd t', 'wincmd l'], 'bufname("%")')
@@ -99,11 +113,11 @@ class EditTest(unittest.TestCase):
         enter = 'execute "normal \\<CR>"'
         found = ['call search("^+ release")']
         lines = vim_eval(found + [enter], 'getline(1, "$")')
-        self.assertIn('- release', lines)
+        self.assertIn('- release [CMakePresets]', lines)
         self.assertIn('    inherits: base', lines)
         lines = vim_eval(found + [enter, 'call search("^- release")', enter],
                          'getline(1, "$")')
-        self.assertIn('+ release', lines)
+        self.assertIn('+ release [CMakePresets]', lines)
         self.assertNotIn('    inherits: base', lines)
 
     def test_flags_and_variables_colored(self):
@@ -124,6 +138,64 @@ class EditTest(unittest.TestCase):
         lines = vim_eval(['call search("^+ build-debug")', 'execute "normal \\<CR>"'],
                          'getline(1, "$")')
         self.assertIn('    configurePreset: debug', lines)
+
+
+class MappingTest(unittest.TestCase):
+    def mapping(self, key, pre=()):
+        return vim_eval([], 'maparg("%s", "n")' % key, pre=pre)
+
+    def test_default_f8(self):
+        self.assertEqual(self.mapping('<F8>'), ':CMakePresets<CR>')
+
+    def test_custom_key(self):
+        pre = ['let g:cmake_presets_map = "<F9>"']
+        self.assertEqual(self.mapping('<F9>', pre), ':CMakePresets<CR>')
+        self.assertEqual(self.mapping('<F8>', pre), '')
+
+    def test_empty_disables(self):
+        self.assertEqual(self.mapping('<F8>', ['let g:cmake_presets_map = ""']), '')
+
+
+class OpenCacheTest(unittest.TestCase):
+    def open_cache(self, search, configured=True):
+        os.makedirs(os.path.join(ROOT, 'tmp'), exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=os.path.join(ROOT, 'tmp')) as d:
+            shutil.copytree(FIXTURE, d, dirs_exist_ok=True)
+            if configured:
+                os.makedirs(os.path.join(d, 'build', 'debug'))
+                open(os.path.join(d, 'build', 'debug', 'CMakeCache.txt'), 'w').close()
+            return vim_eval(['call search("%s")' % search, 'normal v'],
+                            'expand("%:t")', cwd=d)
+
+    def test_v_opens_cache(self):
+        self.assertEqual(self.open_cache('^+ debug'), 'CMakeCache.txt')
+
+    def test_v_on_build_entry_opens_cache(self):
+        self.assertEqual(self.open_cache('^+ build-debug'), 'CMakeCache.txt')
+
+    def test_v_unconfigured_stays_in_sidebar(self):
+        self.assertEqual(self.open_cache('^+ debug', False), '[CMake Presets]')
+
+
+class CleanTest(unittest.TestCase):
+    def run_clean(self, answer, key_search='^+ debug'):
+        os.makedirs(os.path.join(ROOT, 'tmp'), exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=os.path.join(ROOT, 'tmp')) as d:
+            shutil.copytree(FIXTURE, d, dirs_exist_ok=True)
+            os.makedirs(os.path.join(d, 'build', 'debug'))
+            open(os.path.join(d, 'build', 'debug', 'CMakeCache.txt'), 'w').close()
+            vim_eval(['py3 cmake_presets.ask = lambda p: %s' % answer,
+                      'call search("%s")' % key_search, 'normal X'], '1', cwd=d)
+            return os.path.isdir(os.path.join(d, 'build', 'debug'))
+
+    def test_yes_deletes_build_dir(self):
+        self.assertFalse(self.run_clean('True'))
+
+    def test_no_keeps_build_dir(self):
+        self.assertTrue(self.run_clean('False'))
+
+    def test_unconfigured_preset_is_noop(self):
+        self.assertTrue(self.run_clean('True', '^+ release'))
 
 
 if __name__ == '__main__':
