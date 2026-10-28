@@ -133,6 +133,15 @@ class EditTest(unittest.TestCase):
         self.assertEqual(vim_eval(expand + ['call search("CMAKE_BUILD_TYPE")'], syn % 8),
                          'CMakePresetsVar')
 
+    def test_o_on_default_configure_opens_configure_preset(self):
+        out = vim_eval(['call search("^+ default")', 'normal o'], 'getline(".")')
+        self.assertIn('"inherits": "base"', out)
+
+    def test_o_on_default_build_opens_build_preset(self):
+        out = vim_eval(['call search("^Build")', 'call search("^+ default")',
+                        'normal o'], 'getline(".")')
+        self.assertIn('"configurePreset": "default"', out)
+
     def test_click_mapped_to_expand(self):
         out = vim_eval([], 'maparg("<LeftMouse>", "n", 0, 1)')
         self.assertEqual(out['buffer'], 1)
