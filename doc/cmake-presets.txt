@@ -1,0 +1,67 @@
+*cmake-presets.txt*  Browse, configure and build CMake presets
+
+Author:  Vicente Adolfo Bolea Sanchez
+License: MIT
+
+==============================================================================
+CONTENTS                                                *cmake-presets-contents*
+
+    1. Introduction ........ |cmake-presets-intro|
+    2. Requirements ........ |cmake-presets-requirements|
+    3. Usage ............... |cmake-presets-usage|
+    4. Mappings ............ |cmake-presets-mappings|
+    5. Options ............. |cmake-presets-options|
+
+==============================================================================
+1. INTRODUCTION                                            *cmake-presets-intro*
+
+A sidebar on the right of the screen lists the presets of the CMake project
+in the current directory (or a parent). It reads `CMakePresets.json` and
+`CMakeUserPresets.json`, including any files they `include`, and shows
+configure and build presets in separate sections. Each preset shows the file
+it comes from. The preset named `default` is highlighted in red.
+
+Configure and build run `cmake` in a terminal split at the bottom.
+
+==============================================================================
+2. REQUIREMENTS                                    *cmake-presets-requirements*
+
+- Vim 8.1 or newer built with |+python3| and |+terminal|.
+- CMake 3.21 or newer for presets version 3.
+
+Neovim is not supported.
+
+==============================================================================
+3. USAGE                                                   *cmake-presets-usage*
+
+                                                              *:CMakePresets*
+:CMakePresets           Open the sidebar, or close it if it is already open.
+
+==============================================================================
+4. MAPPINGS                                             *cmake-presets-mappings*
+
+These mappings are local to the sidebar buffer. They act on the preset under
+the cursor. On a build preset, configure acts on its configure preset.
+
+<CR> or click   Expand or collapse the settings of the preset.
+B               Build. Uses a build preset for the configure preset if
+                there is one, otherwise `cmake --build <binaryDir>`.
+C               Configure with `cmake --preset <name>`.
+o               Open the file that defines the preset, on its line.
+v               Open the `CMakeCache.txt` of the preset.
+X               Delete the build directory after asking for confirmation.
+                Refuses to run if the build directory contains the project.
+R               Refresh the list.
+q               Close the sidebar.
+
+==============================================================================
+5. OPTIONS                                               *cmake-presets-options*
+
+                                                         *g:cmake_presets_map*
+g:cmake_presets_map     Normal mode key that toggles the sidebar.
+                        Default: `<F8>`. Set to an empty string to disable.
+>
+    let g:cmake_presets_map = '<F9>'
+<
+
+ vim:tw=78:ts=8:ft=help:norl:

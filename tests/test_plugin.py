@@ -133,6 +133,15 @@ class EditTest(unittest.TestCase):
         self.assertEqual(vim_eval(expand + ['call search("CMAKE_BUILD_TYPE")'], syn % 8),
                          'CMakePresetsVar')
 
+    def test_o_on_default_configure_opens_configure_preset(self):
+        out = vim_eval(['call search("^+ default")', 'normal o'], 'getline(".")')
+        self.assertIn('"inherits": "base"', out)
+
+    def test_o_on_default_build_opens_build_preset(self):
+        out = vim_eval(['call search("^Build")', 'call search("^+ default")',
+                        'normal o'], 'getline(".")')
+        self.assertIn('"configurePreset": "default"', out)
+
     def test_click_mapped_to_expand(self):
         out = vim_eval([], 'maparg("<LeftMouse>", "n", 0, 1)')
         self.assertEqual(out['buffer'], 1)
@@ -142,6 +151,16 @@ class EditTest(unittest.TestCase):
         lines = vim_eval(['call search("^+ build-debug")', 'execute "normal \\<CR>"'],
                          'getline(1, "$")')
         self.assertIn('    configurePreset: debug', lines)
+
+
+class HelpTest(unittest.TestCase):
+    def test_help_tags_resolve(self):
+        os.makedirs(os.path.join(ROOT, 'tmp'), exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=os.path.join(ROOT, 'tmp')) as d:
+            shutil.copytree(os.path.join(ROOT, 'doc'), os.path.join(d, 'doc'))
+            out = vim_eval(['helptags %s/doc' % d, 'help cmake-presets-mappings'],
+                           'expand("%:t")', pre=['set rtp+=' + d])
+        self.assertEqual(out, 'cmake-presets.txt')
 
 
 class MappingTest(unittest.TestCase):

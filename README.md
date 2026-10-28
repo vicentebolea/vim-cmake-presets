@@ -16,11 +16,20 @@ Expand a preset to see its settings, then configure it in a terminal split:
 
 ## Install
 
-Add the directory to your runtimepath, or use a plugin manager:
+With [vim-plug](https://github.com/junegunn/vim-plug):
 
 ```vim
-set rtp+=~/Projects/vim-cmake-presets
+Plug 'vicentebolea/vim-cmake-presets'
 ```
+
+With Vim's built-in packages:
+
+```sh
+git clone https://github.com/vicentebolea/vim-cmake-presets \
+  ~/.vim/pack/plugins/start/vim-cmake-presets
+```
+
+Then run `:help cmake-presets` for the manual. Neovim is not supported.
 
 ## Usage
 
