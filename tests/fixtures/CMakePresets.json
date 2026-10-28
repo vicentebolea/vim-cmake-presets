@@ -1,0 +1,14 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {"name": "base", "hidden": true, "binaryDir": "${sourceDir}/build/${presetName}"},
+    {"name": "default", "inherits": "base"},
+    {"name": "debug", "inherits": "base"},
+    {"name": "release", "inherits": ["base"], "generator": "Ninja",
+     "cacheVariables": {"CMAKE_BUILD_TYPE": "Release"}}
+  ],
+  "buildPresets": [
+    {"name": "build-debug", "configurePreset": "debug"},
+    {"name": "default", "configurePreset": "default"}
+  ]
+}
