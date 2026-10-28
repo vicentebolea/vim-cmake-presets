@@ -3,6 +3,12 @@
 A Vim sidebar that lists your CMake presets and lets you configure and build
 them in a terminal split. Written in Python.
 
+![Preset sidebar](.assets/img1.png)
+
+Expand a preset to see its settings, then configure it in a terminal split:
+
+![Expanded preset and configure terminal](.assets/img2.png)
+
 ## Requirements
 
 - Vim 8.1 or newer built with `+python3` and `+terminal`
