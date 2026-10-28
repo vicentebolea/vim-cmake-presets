@@ -29,8 +29,12 @@ def vim_eval(commands, expr, cwd=FIXTURE, pre=()):
 
 
 def term_cmd(search, key):
-    return vim_eval(['call search("%s")' % search, 'normal ' + key],
-                    'job_info(term_getjob(bufnr("%")))["cmd"]')
+    # The terminal job really runs, so keep it away from the fixtures.
+    os.makedirs(os.path.join(ROOT, 'tmp'), exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=os.path.join(ROOT, 'tmp')) as d:
+        shutil.copytree(FIXTURE, d, dirs_exist_ok=True)
+        return vim_eval(['call search("%s")' % search, 'normal ' + key],
+                        'job_info(term_getjob(bufnr("%")))["cmd"]', cwd=d)
 
 
 class SidebarTest(unittest.TestCase):
@@ -89,8 +93,8 @@ class ActionTest(unittest.TestCase):
 
     def test_build_falls_back_to_binary_dir(self):
         cmd = term_cmd('^+ release', 'B')
-        self.assertEqual(cmd, ['cmake', '--build',
-                               os.path.join(FIXTURE, 'build/release')])
+        self.assertEqual(cmd[:2], ['cmake', '--build'])
+        self.assertTrue(cmd[2].endswith(os.path.join('build', 'release')))
 
     def test_build_section_entry(self):
         self.assertEqual(term_cmd('build-debug', 'B'),
@@ -196,6 +200,31 @@ class CleanTest(unittest.TestCase):
 
     def test_unconfigured_preset_is_noop(self):
         self.assertTrue(self.run_clean('True', '^+ release'))
+
+
+def cmake_at_least(major, minor):
+    try:
+        out = subprocess.run(['cmake', '--version'], capture_output=True,
+                             text=True).stdout.split()[2]
+    except (OSError, IndexError):
+        return False
+    return tuple(int(x) for x in out.split('.')[:2]) >= (major, minor)
+
+
+@unittest.skipUnless(cmake_at_least(3, 21) and shutil.which('cc'),
+                     'needs cmake >= 3.21 and a C compiler')
+class CProjectTest(unittest.TestCase):
+    def test_configure_and_build_c_project(self):
+        os.makedirs(os.path.join(ROOT, 'tmp'), exist_ok=True)
+        configure = term_cmd('^+ debug', 'C')
+        build = term_cmd('^+ debug', 'B')
+        with tempfile.TemporaryDirectory(dir=os.path.join(ROOT, 'tmp')) as d:
+            shutil.copytree(FIXTURE, d, dirs_exist_ok=True)
+            for cmd in (configure, build):
+                subprocess.run(cmd, cwd=d, check=True, capture_output=True)
+            exe = os.path.join(d, 'build', 'debug', 'hello')
+            out = subprocess.run([exe], capture_output=True, text=True).stdout
+            self.assertIn('hello from vim-cmake-presets', out)
 
 
 if __name__ == '__main__':

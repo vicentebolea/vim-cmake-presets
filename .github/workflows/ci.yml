@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: Vim ${{ matrix.vim }}
+    runs-on: ubuntu-latest
+    container: ubuntu:${{ matrix.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - vim: 8
+            image: "20.04"
+          - vim: 9
+            image: "24.04"
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Install dependencies
+        run: apt-get update && apt-get install -y vim-nox python3 cmake gcc make git
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Show versions
+        run: |
+          vim --version | head -n 1
+          vim --version | grep -o '[+-]python3[^ ]*'
+      - name: Plugin loads
+        run: |
+          vim -es -u NONE -N --cmd "set rtp+=$PWD" \
+            -c 'runtime plugin/cmake_presets.vim' \
+            -c 'py3 import cmake_presets' \
+            -c 'if exists(":CMakePresets") != 2 | cquit | endif' \
+            -c 'qa!'
+      - name: Tests
+        run: python3 -m unittest discover -s tests -v
