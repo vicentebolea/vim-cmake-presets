@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/vicentebolea/vim-cmake-presets/compare/v1.0.0...v1.0.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* open the build preset line when it shares a name with a configure preset ([d1a9732](https://github.com/vicentebolea/vim-cmake-presets/commit/d1a9732662698ef2125362ff6dc7a758e023ddba))
+
 # 1.0.0 (2026-10-28)
 
 
