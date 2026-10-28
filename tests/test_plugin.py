@@ -144,6 +144,16 @@ class EditTest(unittest.TestCase):
         self.assertIn('    configurePreset: debug', lines)
 
 
+class HelpTest(unittest.TestCase):
+    def test_help_tags_resolve(self):
+        os.makedirs(os.path.join(ROOT, 'tmp'), exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=os.path.join(ROOT, 'tmp')) as d:
+            shutil.copytree(os.path.join(ROOT, 'doc'), os.path.join(d, 'doc'))
+            out = vim_eval(['helptags %s/doc' % d, 'help cmake-presets-mappings'],
+                           'expand("%:t")', pre=['set rtp+=' + d])
+        self.assertEqual(out, 'cmake-presets.txt')
+
+
 class MappingTest(unittest.TestCase):
     def mapping(self, key, pre=()):
         return vim_eval([], 'maparg("%s", "n")' % key, pre=pre)
