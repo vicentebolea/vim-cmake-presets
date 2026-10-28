@@ -235,6 +235,9 @@ def edit():
     kind, name = entry
     preset = next(p for p in state[kind] if p['name'] == name)
     _open(preset['_file'])
+    # Configure and build presets can share a name, so start at the right section.
+    vim.Function('cursor')(1, 1)
+    vim.Function('search')('"%sPresets"' % kind)
     vim.Function('search')(r'"name"\s*:\s*"%s"' % name)
 
 
